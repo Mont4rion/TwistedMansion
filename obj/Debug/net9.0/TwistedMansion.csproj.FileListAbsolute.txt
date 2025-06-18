@@ -1,0 +1,14 @@
+C:\TwistedMansion\bin\Debug\net9.0\TwistedMansion.exe
+C:\TwistedMansion\bin\Debug\net9.0\TwistedMansion.deps.json
+C:\TwistedMansion\bin\Debug\net9.0\TwistedMansion.runtimeconfig.json
+C:\TwistedMansion\bin\Debug\net9.0\TwistedMansion.dll
+C:\TwistedMansion\bin\Debug\net9.0\TwistedMansion.pdb
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.GeneratedMSBuildEditorConfig.editorconfig
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.AssemblyInfoInputs.cache
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.AssemblyInfo.cs
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.csproj.CoreCompileInputs.cache
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.dll
+C:\TwistedMansion\obj\Debug\net9.0\refint\TwistedMansion.dll
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.pdb
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.genruntimeconfig.cache
+C:\TwistedMansion\obj\Debug\net9.0\ref\TwistedMansion.dll
