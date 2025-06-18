@@ -12,3 +12,4 @@ C:\TwistedMansion\obj\Debug\net9.0\refint\TwistedMansion.dll
 C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.pdb
 C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.genruntimeconfig.cache
 C:\TwistedMansion\obj\Debug\net9.0\ref\TwistedMansion.dll
+C:\TwistedMansion\obj\Debug\net9.0\TwistedMansion.sourcelink.json

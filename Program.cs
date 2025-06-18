@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-// Removed unused using System.Runtime.Serialization; // This namespace is not used and can be removed.
 
 public class GameLogic
 {
-    // Static fields to hold the current state of the game
-    static Room currentRoom; // Holds the room where the player currently is
-    static ObjectManager objectManager; // Manages all game objects like rooms, items, etc.
-    static Player player; // Player object needs to be initialized!
+    static Room currentRoom;
+    static ObjectManager objectManager;
+    static Player player;
 
     static void Main()
     {
@@ -15,33 +13,12 @@ public class GameLogic
         Console.WriteLine("Welcome to the Text-RPG!");
         Console.WriteLine("------------------------------------");
 
-        // --- Initialize the ObjectManager to create all game objects ---
-        // This is where all your rooms, items, and their connections are set up.
         objectManager = new ObjectManager();
+        currentRoom = objectManager.GetRoom("Hallway");
+        player = new Player("Hero");
 
-        // Set the starting room using the ObjectManager
-        // You can choose any room defined in ObjectManager as the starting point.
-        currentRoom = objectManager.GetRoom("Hallway"); 
-
-        // --- Initialize the Player object here ---
-        player = new Player("Hero"); // Create a new player instance with a name!
-
-        // --- Optional: Give the player a starting item for testing ---
-        Item startingKey = objectManager.GetItem("Rusty Key");
-        if (startingKey != null)
-        {
-            // Remove the item from its initial room so the player can truly "take" it
-            // if you want it to be initially in their inventory.
-            // For now, let's just add it to the player without removing from room for simplicity
-            // or ensure it's not placed in a room initially if it's a starting item.
-            // If the key is *in* the Hallway, you'd want to remove it only when taken by command.
-            // For this fix, we'll assume the player starts with nothing and picks it up.
-        }
-
-        // --- Start the game ---
         DisplayRoom(); // Initial display of the starting room
 
-        // Main game loop: Continuously takes player input and processes commands
         while (true)
         {
             Console.Write("\nWhat do you want to do? (e.g., go north, look, take item, inventory, 'quit') ");
@@ -50,21 +27,34 @@ public class GameLogic
             if (command == "quit")
             {
                 Console.WriteLine("Thanks for playing!");
-                break; // Exit the game loop
+                break;
             }
-            // --- Inventory command logic ---
             else if (command == "inventory")
             {
-                player.DisplayInventory(); // Call the DisplayInventory method on your player object
+                player.DisplayInventory();
             }
+            // --- "look" (general room description AND items in room) command logic ---
             else if (command == "look")
             {
+                // Display the room description
+                Console.WriteLine($"\n--- {currentRoom.Name.ToUpper()} ---");
+                Console.WriteLine(currentRoom.Description);
+                Console.WriteLine(currentRoom.GetAvailableExits());
+
+                // Display items currently in the room
                 if (currentRoom.ItemsInRoom.Count > 0)
                 {
                     Console.WriteLine("You see the following items here:");
                     foreach (var item in currentRoom.ItemsInRoom)
                     {
-                        Console.WriteLine($"- {item.Name}");
+                        if (item.ItemsInBox.Count > 0)
+                        {
+                            Console.WriteLine($"- {item.Name} (which contains something)");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"- {item.Name}");
+                        }
                     }
                 }
                 else
@@ -72,35 +62,115 @@ public class GameLogic
                     Console.WriteLine("There are no notable items here.");
                 }
             }
+            // --- "look [item name]" command logic ---
+            else if (command.StartsWith("look "))
+            {
+                string targetItemName = command.Substring("look ".Length).Trim();
+                
+                Item foundItem = null;
+
+                // 1. Search for the item in the current room
+                foundItem = currentRoom.ItemsInRoom.Find(item => item.Name.ToLower() == targetItemName.ToLower());
+
+                // 2. If not found in the room, search in the player's inventory
+                if (foundItem == null)
+                {
+                    foundItem = player.Inventory.Find(item => item.Name.ToLower() == targetItemName.ToLower());
+                }
+
+                // 3. Check if the item was found anywhere
+                if (foundItem != null)
+                {
+                    if (foundItem.Moveable == false) // This is a non-movable item, likely a container
+                    {
+                        Console.WriteLine($"You look at the {foundItem.Name}. {foundItem.Description}");
+                        
+                        if (foundItem.ItemsInBox.Count > 0)
+                        {
+                            Console.WriteLine($"Inside the {foundItem.Name}, you see:");
+                            foreach (var containedItem in foundItem.ItemsInBox)
+                            {
+                                Console.WriteLine($"- {containedItem.Name}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"The {foundItem.Name} appears to be empty.");
+                        }
+                    }
+                    else // foundItem.Moveable == true
+                    {
+                        Console.WriteLine($"You look closely at the {foundItem.Name}. {foundItem.Description}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"You don't see a '{targetItemName}' here or in your inventory.");
+                }
+            }
             // --- Take item command logic ---
             else if (command.StartsWith("take "))
             {
                 string itemName = command.Substring("take ".Length).Trim();
-                Item itemToTake = currentRoom.ItemsInRoom.Find(item => item.Name.ToLower() == itemName.ToLower());
+                Item itemToTake = null;
+                Item containerItem = null; // To store the container if the item is inside one
 
-                if (itemToTake != null)
+                // First, try to find the item directly in the current room
+                itemToTake = currentRoom.ItemsInRoom.Find(item => item.Name.ToLower() == itemName.ToLower());
+
+                // If not found directly, check if it's inside any container in the room
+                if (itemToTake == null)
                 {
-                    Console.WriteLine($"You take the {itemToTake.Name}.");
-                    currentRoom.ItemsInRoom.Remove(itemToTake); // Remove item from the room
-                    player.AddItem(itemToTake); // Add item to player's inventory
-                    DisplayRoom(); // Refresh room description to reflect item is gone
+                    foreach (var roomItem in currentRoom.ItemsInRoom)
+                    {
+                        // Check if the roomItem is a container and holds the target item
+                        if (roomItem.ItemsInBox.Count > 0)
+                        {
+                            itemToTake = roomItem.ItemsInBox.Find(contained => contained.Name.ToLower() == itemName.ToLower());
+                            if (itemToTake != null)
+                            {
+                                containerItem = roomItem; // Found it in this container!
+                                break; // Stop searching containers
+                            }
+                        }
+                    }
                 }
-                else
+
+                if (itemToTake != null) // Item was found (either directly or in a container)
+                {
+                    if (itemToTake.Moveable)
+                    {
+                        Console.WriteLine($"You take the {itemToTake.Name}.");
+                        if (containerItem != null)
+                        {
+                            containerItem.ItemsInBox.Remove(itemToTake); // Remove from container
+                        }
+                        else
+                        {
+                            currentRoom.ItemsInRoom.Remove(itemToTake); // Remove from room directly
+                        }
+                        player.AddItem(itemToTake); // Add to player's inventory
+                    }
+                    else // Item found but is not movable
+                    {
+                        Console.WriteLine($"You cannot take the {itemToTake.Name}. It seems to be fixed in place.");
+                    }
+                }
+                else // Item was not found at all
                 {
                     Console.WriteLine($"You don't see a '{itemName}' here.");
                 }
             }
-            // --- Movement commands ---
+            // --- Movement commands (only cardinal directions) ---
             else if (command.StartsWith("go "))
             {
-                string direction = command.Substring(3); // Get the part after "go "
+                string direction = command.Substring(3);
                 MovePlayer(direction);
             }
-            else if (currentRoom.Exits.ContainsKey(command))
+            else if (currentRoom.Exits.ContainsKey(command)) // This will now only match cardinal directions like "north"
             {
                 MovePlayer(command);
             }
-            // --- Unrecognized command ---
             else
             {
                 Console.WriteLine("I don't understand that command, or you can't go that way.");
@@ -109,104 +179,96 @@ public class GameLogic
     }
 
     /// <summary>
-    /// Displays the current room's information to the player.
+    /// Displays the current room's information to the player, but NOT its items.
+    /// Items are displayed separately with the 'look' command.
     /// </summary>
     static void DisplayRoom()
     {
         Console.WriteLine($"\n--- {currentRoom.Name.ToUpper()} ---");
         Console.WriteLine(currentRoom.Description);
-        Console.WriteLine(currentRoom.GetAvailableExits()); // Show available exits from the current room
+        Console.WriteLine(currentRoom.GetAvailableExits());
     }
 
     /// <summary>
     /// Attempts to move the player in the specified direction.
     /// </summary>
-    /// <param name="direction">The direction string provided by the player (e.g., "north", "1").</param>
+    /// <param name="direction">The direction string provided by the player (e.g., "north").</param>
     static void MovePlayer(string direction)
     {
-        // Try to get the target room from the current room's exits
         if (currentRoom.Exits.TryGetValue(direction, out Room nextRoom))
         {
-            currentRoom = nextRoom; // Update the player's current room
-            DisplayRoom(); // Display the new room's information
+            currentRoom = nextRoom;
+            DisplayRoom();
         }
         else
         {
-            Console.WriteLine("You can't go that way."); // Inform the player if the exit doesn't exist
+            Console.WriteLine("You can't go that way.");
         }
     }
 }
 
 public class ObjectManager
 {
-    // A public property to hold all rooms, accessible from other classes by name
     public Dictionary<string, Room> WorldRooms { get; private set; }
-    // A public property to hold all game items, accessible by name
     public Dictionary<string, Item> WorldItems { get; private set; }
 
     public ObjectManager()
     {
         WorldRooms = new Dictionary<string, Room>();
-        WorldItems = new Dictionary<string, Item>(); // Initialize the items dictionary
+        WorldItems = new Dictionary<string, Item>();
 
-        InitializeRooms(); // Set up all rooms and their connections
-        InitializeItems(); // Set up all items and potentially place them in rooms
+        InitializeRooms();
+        InitializeItems();
     }
 
-    /// <summary>
-    /// Creates and configures all rooms and their exits in the game world.
-    /// </summary>
     private void InitializeRooms()
     {
-        // Create individual room instances
         Room hallway = new Room("Hallway", "You are in a long, dimly lit hallway. The air smells musty.");
         Room library = new Room("Library", "A vast library filled with dusty tomes. A faint glow emanates from a corner.");
         Room kitchen = new Room("Kitchen", "A messy kitchen with an unwashed pan in the sink. The lingering scent of burnt toast hangs heavy.");
 
-        // Add rooms to the WorldRooms dictionary for easy lookup by name
         WorldRooms.Add("Hallway", hallway);
         WorldRooms.Add("Library", library);
         WorldRooms.Add("Kitchen", kitchen);
 
-        // Define exits between rooms using their names and the WorldRooms dictionary
-        WorldRooms["Hallway"].AddExit("north", WorldRooms["Library"]);    // North from Hallway leads to Library
-        WorldRooms["Hallway"].AddExit("east", WorldRooms["Kitchen"]);     // East from Hallway leads to Kitchen
+        WorldRooms["Hallway"].AddExit("north", WorldRooms["Library"]);
+        WorldRooms["Hallway"].AddExit("east", WorldRooms["Kitchen"]);
+        
+        WorldRooms["Library"].AddExit("south", WorldRooms["Hallway"]);
 
-        WorldRooms["Library"].AddExit("south", WorldRooms["Hallway"]);    // South from Library leads to Hallway
-
-        WorldRooms["Kitchen"].AddExit("west", WorldRooms["Hallway"]);     // West from Kitchen leads to Hallway
+        WorldRooms["Kitchen"].AddExit("west", WorldRooms["Hallway"]);
 
         Console.WriteLine("Game world (rooms and exits) initialized successfully.");
     }
 
-    /// <summary>
-    /// Creates and configures all items in the game.
-    /// </summary>
     private void InitializeItems()
     {
-        // Create an Item instance and store it in the WorldItems dictionary
-        Item rustyKey = new Item("Rusty Key", "A very old, rusty key. It looks like it might open something.");
-        WorldItems.Add("Rusty Key", rustyKey); // Use the item's name as the key for easy lookup
+        Item rustyKey = new Item("Rusty Key", "A very old, rusty key. It looks like it might open something.", true); 
+        WorldItems.Add("Rusty Key", rustyKey);
 
-        Item oldBook = new Item("Old Book", "A dusty, leather-bound book. The title is unreadable.");
+        Item oldBook = new Item("Old Book", "A dusty, leather-bound book. The title is unreadable.", true);
         WorldItems.Add("Old Book", oldBook);
 
-        // --- Place items in rooms ---
-        // Access rooms via WorldRooms dictionary and add items to their ItemsInRoom list
+        Item kitchenKnife = new Item("Kitchen Knife", "A dull and brittle knife.", true);
+        WorldItems.Add("Kitchen Knife", kitchenKnife);
+
+        // Container item
+        Item kitchenShelf = new Item("Kitchen Shelf", "An old, worn-out shelf fixed to the wall. It looks like it could hold items.", false);
+        WorldItems.Add("Kitchen Shelf", kitchenShelf); 
+
+        // Place items in rooms
         WorldRooms["Hallway"].ItemsInRoom.Add(rustyKey);
         WorldRooms["Library"].ItemsInRoom.Add(oldBook);
+        WorldRooms["Kitchen"].ItemsInRoom.Add(kitchenShelf); 
+
+        // Place items INTO the container item
+        kitchenShelf.ItemsInBox.Add(kitchenKnife); 
 
         Console.WriteLine("Game items initialized successfully.");
     }
 
-    /// <summary>
-    /// Retrieves a Room object by its name from the WorldRooms dictionary.
-    /// </summary>
-    /// <param name="roomName">The name of the room to retrieve.</param>
-    /// <returns>The Room object if found; otherwise, null.</returns>
     public Room GetRoom(string roomName)
     {
-        // Use TryGetValue for safe access, avoiding exceptions if the key doesn't exist
         if (WorldRooms.TryGetValue(roomName, out Room room))
         {
             return room;
@@ -215,11 +277,6 @@ public class ObjectManager
         return null; 
     }
 
-    /// <summary>
-    /// Retrieves an Item object by its name from the WorldItems dictionary.
-    /// </summary>
-    /// <param name="itemName">The name of the item to retrieve.</param>
-    /// <returns>The Item object if found; otherwise, null.</returns>
     public Item GetItem(string itemName)
     {
         if (WorldItems.TryGetValue(itemName, out Item item))
@@ -234,27 +291,20 @@ public class ObjectManager
 public class Player
 {
     public string Name { get; set; }
-    public List<Item> Inventory { get; set; } // The player's personal list of items
+    public List<Item> Inventory { get; set; }
 
     public Player(string name)
     {
         Name = name;
-        Inventory = new List<Item>(); // Initialize the inventory when a player is created
+        Inventory = new List<Item>();
     }
 
-    /// <summary>
-    /// Adds an item to the player's inventory.
-    /// </summary>
-    /// <param name="item">The item to add.</param>
     public void AddItem(Item item)
     {
         Inventory.Add(item);
         Console.WriteLine($"You put the {item.Name} into your inventory.");
     }
 
-    /// <summary>
-    /// Displays the contents of the player's inventory.
-    /// </summary>
     public void DisplayInventory()
     {
         if (Inventory.Count > 0)
@@ -262,7 +312,7 @@ public class Player
             Console.WriteLine("\n--- Your Inventory ---");
             foreach (var item in Inventory)
             {
-                Console.WriteLine($"- {item.Name} ({item.Description})"); // Show name and description
+                Console.WriteLine($"- {item.Name} ({item.Description})");
             }
             Console.WriteLine("----------------------");
         }
@@ -276,47 +326,31 @@ public class Player
 public class Room
 {
     public string Name { get; set; }
-    public string Description { get; set; } // The primary text description of the room
-    public Dictionary<string, Room> Exits { get; set; } // Stores possible exits and their target Room objects
-    public List<Item> ItemsInRoom { get; set; } // List to hold items currently present in this room
+    public string Description { get; set; }
+    public Dictionary<string, Room> Exits { get; set; }
+    public List<Item> ItemsInRoom { get; set; }
 
-    /// <summary>
-    /// Constructor for the Room class.
-    /// </summary>
-    /// <param name="name">The name of the room.</param>
-    /// <param name="description">The descriptive text for the room.</param>
     public Room(string name, string description)
     {
         this.Name = name;
         this.Description = description;
-        this.Exits = new Dictionary<string, Room>(); // Initialize the dictionary for exits
-        this.ItemsInRoom = new List<Item>(); // Initialize the list of items in the room
+        this.Exits = new Dictionary<string, Room>();
+        this.ItemsInRoom = new List<Item>();
     }
 
-    /// <summary>
-    /// Adds an exit from this room to another room.
-    /// </summary>
-    /// <param name="direction">The keyword/direction (e.g., "north", "1") to take this exit.</param>
-    /// <param name="targetRoom">The Room object that this exit leads to.</param>
     public void AddExit(string direction, Room targetRoom)
     {
-        // Store the direction in lowercase to handle case-insensitive player input
         Exits.Add(direction.ToLower(), targetRoom); 
     }
 
-    /// <summary>
-    /// Generates a string describing all available exits from this room for the player.
-    /// </summary>
-    /// <returns>A formatted string listing the exits.</returns>
     public string GetAvailableExits()
     {
         List<string> exitDescriptions = new List<string>();
         foreach (var exit in Exits)
         {
-            // Format each exit as "'direction' leads to the RoomName"
             exitDescriptions.Add($"'{exit.Key}' leads to the {exit.Value.Name}");
         }
-        return "You see exits: " + string.Join(", ", exitDescriptions) + "."; // Join them with ", "
+        return "You see exits: " + string.Join(", ", exitDescriptions) + ".";
     }
 }
 
@@ -324,30 +358,22 @@ public class Item
 {
     public string Name { get; set; }
     public string Description { get; set; }
+    public bool Moveable { get; set; }
+    public List<Item> ItemsInBox { get; set; }
 
-    /// <summary>
-    /// Constructor for the Item class.
-    /// </summary>
-    /// <param name="name">The name of the item.</param>
-    /// <param name="description">The descriptive text for the item.</param>
-    public Item(string name, string description)
+    public Item(string name, string description, bool moveable)
     {
         this.Name = name;
         this.Description = description;
+        this.Moveable = moveable;
+        this.ItemsInBox = new List<Item>();
     }
 }
 
-// --- Placeholder Classes for Future Development ---
-// Removed the redundant 'Inventory' class as its functionality is now within the Player class.
-
 public class Interactions
 {
-    // This class will handle player interactions with objects and NPCs in the game world.
-    // Examples: Using an item, talking to an NPC, solving a puzzle.
 }
 
 public class Events
 {
-    // This class could manage in-game events, quests, or triggers.
-    // Examples: A door opening after a specific action, a new NPC appearing.
 }
