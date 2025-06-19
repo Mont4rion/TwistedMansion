@@ -1,0 +1,37 @@
+{
+  "PlayerName": "Hero",
+  "PlayerInventoryItemNames": [
+    "Rusty Key"
+  ],
+  "CurrentRoomName": "Hallway",
+  "RoomItemsState": null,
+  "RoomExitLockedStates": {
+    "Hallway": {
+      "north": false,
+      "east": false
+    },
+    "Library": {
+      "south": false,
+      "east": true
+    },
+    "Kitchen": {
+      "west": false,
+      "south": true
+    },
+    "Guestroom": {
+      "north": false,
+      "east": false
+    },
+    "Bathroom": {
+      "west": false,
+      "north": false
+    },
+    "Corridor": {
+      "south": false,
+      "west": false
+    }
+  },
+  "GuestroomEventCount": 0,
+  "LibraryEventTriggered": false,
+  "CorridorLibraryDoorUnlocked": false
+}
