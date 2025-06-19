@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TwistedMansion")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9ff0b061514576b8d71a5345446be8b0e68de488")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c5c33bd87d6122894057477e7e1f9fe4fb72b0d2")]
 [assembly: System.Reflection.AssemblyProductAttribute("TwistedMansion")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TwistedMansion")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
