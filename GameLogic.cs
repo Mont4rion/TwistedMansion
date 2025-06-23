@@ -2,20 +2,206 @@
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Versioning;
-using System.Reflection.Metadata.Ecma335; // Für .Any() und .Select()
 
-// Start der GameLogic Klasse
 public class GameLogic
 {
     static Room currentRoom;
     static ObjectManager objectManager;
     static Player player;
     static Interactions interactions;
-    static Item item;
     static Events gameEvents;
     static bool inExclusiveEventMode = false;
     static SaveGameManager saveGameManager;
+
+    static GameLogic()
+    {
+        objectManager = new ObjectManager();
+
+        objectManager.InitializeRooms();
+        objectManager.InitializeItems();
+        objectManager.InitializeKombinations();
+
+        saveGameManager = new SaveGameManager("savegame.json");
+    }
+
+    /// <summary>
+    /// Displays the current room's name, description, available exits, and items.
+    /// </summary>
+    static void DisplayRoom()
+    {
+        Console.WriteLine($"\n--- {currentRoom.Name.ToUpper()} ---");
+        Console.WriteLine(currentRoom.Description);
+        Console.WriteLine(currentRoom.GetAvailableExits());
+
+        if (currentRoom.ItemsInRoom.Any())
+        {
+            Console.WriteLine("You see the following items here:");
+            foreach (var item in currentRoom.ItemsInRoom)
+            {
+                if (item.ItemsInBox.Any())
+                {
+                    Console.WriteLine($"- {item.Name} (which contains something)");
+                }
+                else
+                {
+                    Console.WriteLine($"- {item.Name}");
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine("There are no notable items here.");
+        }
+    }
+
+    /// <summary>
+    /// Adds test items to the player's inventory for development purposes.
+    /// This method should ideally be removed or commented out for a release build.
+    /// </summary>
+    static void TestItems()
+    {
+        // Example: Give the player starting items for testing combinations
+        // Ensure you add these items only if the player doesn't already have them,
+        // especially important if calling TestItems multiple times or loading a game.
+        if (!player.Inventory.Any(i => i.Name == "Empty Frame"))
+        {
+            player.AddItem(objectManager.WorldItems["Empty Frame"]);
+        }
+        if (!player.Inventory.Any(i => i.Name == "Butterfly Blue"))
+        {
+            player.AddItem(objectManager.WorldItems["Butterfly Blue"]);
+        }
+        if (!player.Inventory.Any(i => i.Name == "Butterfly Red"))
+        {
+            player.AddItem(objectManager.WorldItems["Butterfly Red"]);
+        }
+        if (!player.Inventory.Any(i => i.Name == "Butterfly Green"))
+        {
+            player.AddItem(objectManager.WorldItems["Butterfly Green"]);
+        }
+        if (!player.Inventory.Any(i => i.Name == "Butterfly Black"))
+        {
+            player.AddItem(objectManager.WorldItems["Butterfly Black"]);
+        }
+    }
+
+    /// <summary>
+    /// Attempts to combine two items from the player's inventory based on predefined combinations.
+    /// This method is more generic and uses the Kombinations definitions directly.
+    /// </summary>
+    /// <param name="item1ToCombine">The first item object from the player's inventory.</param>
+    /// <param name="item2ToCombine">The second item object from the player's inventory.</param>
+    public static void TryCombineItems(Item item1ToCombine, Item item2ToCombine)
+    {
+        string name1 = item1ToCombine.Name;
+        string name2 = item2ToCombine.Name;
+
+        // Collect all specific butterfly names for comparison
+        List<string> specificButterflyNames = new List<string> { "Butterfly Blue", "Butterfly Red", "Butterfly Green", "Butterfly Black" };
+
+        bool foundCombination = false;
+
+        foreach (var combinationEntry in objectManager.WorldKombinations)
+        {
+            Kombinations comboDefinition = combinationEntry.Value;
+
+            // Ensure the combination rule expects exactly two components
+            if (comboDefinition.RequiredItems == null || comboDefinition.RequiredItems.Count != 2)
+            {
+                continue; // Skip if not a 2-item combination
+            }
+
+            string required1 = comboDefinition.RequiredItems[0];
+            string required2 = comboDefinition.RequiredItems[1];
+
+            // Check if player's items match the required components, considering permutations and generic "Butterfly"
+            bool match = false;
+
+            // Scenario 1: Both required items are specific names (no generic "Butterfly")
+            if (!required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) && !required2.Equals("Butterfly", StringComparison.OrdinalIgnoreCase))
+            {
+                if ((name1.Equals(required1, StringComparison.OrdinalIgnoreCase) && name2.Equals(required2, StringComparison.OrdinalIgnoreCase)) ||
+                    (name1.Equals(required2, StringComparison.OrdinalIgnoreCase) && name2.Equals(required1, StringComparison.OrdinalIgnoreCase)))
+                {
+                    match = true;
+                }
+            }
+            // Scenario 2: One specific item, one generic "Butterfly"
+            else if (required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) || required2.Equals("Butterfly", StringComparison.OrdinalIgnoreCase))
+            {
+                string specificRequiredItem = required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) ? required2 : required1;
+
+                if ((name1.Equals(specificRequiredItem, StringComparison.OrdinalIgnoreCase) && specificButterflyNames.Contains(name2)) ||
+                    (name2.Equals(specificRequiredItem, StringComparison.OrdinalIgnoreCase) && specificButterflyNames.Contains(name1)))
+                {
+                    match = true;
+                }
+            }
+
+            if (match)
+            {
+                Console.WriteLine($"You combined the {name1} and the {name2} to create a {comboDefinition.Name}!");
+                player.RemoveItem(item1ToCombine);
+                player.RemoveItem(item2ToCombine);
+
+                // Add the resulting item to the player's inventory
+                Item resultItem = objectManager.GetItem(comboDefinition.Name);
+                if (resultItem != null)
+                {
+                    player.AddItem(resultItem);
+                    foundCombination = true;
+                    break; // Combination found and processed, exit loop
+                }
+                else
+                {
+                    Console.WriteLine($"Error: The resulting item '{comboDefinition.Name}' was not found in the game world.");
+                    foundCombination = true; // Mark as found to avoid "cannot be combined" message
+                    break; // Exit loop even on error, as a rule was matched
+                }
+            }
+        }
+
+        if (!foundCombination)
+        {
+            Console.WriteLine("These items cannot be combined.");
+        }
+    }
+
+
+    /// <summary>
+    /// Handles player movement to a different room.
+    /// </summary>
+    /// <param name="direction">The direction the player wants to move (e.g., "north", "east").</param>
+    static void MovePlayer(string direction)
+    {
+        if (currentRoom.Exits.TryGetValue(direction, out Exit exit))
+        {
+            if (exit.IsLocked)
+            {
+                Console.WriteLine($"The way to {exit.TargetRoom.Name} is locked. Maybe you need something to open it.");
+            }
+            else
+            {
+                currentRoom = exit.TargetRoom;
+                interactions.UpdateCurrentRoom(currentRoom);
+                gameEvents.UpdateCurrentRoom(currentRoom.Name);
+
+                DisplayRoom();
+
+                inExclusiveEventMode = gameEvents.CheckForRoomEvents();
+
+                if (inExclusiveEventMode)
+                {
+                    // If an exclusive event started, it takes over the input
+                    // No further action needed here, the event loop will handle it.
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine("You can't go that way.");
+        }
+    }
 
     static void Main()
     {
@@ -23,11 +209,6 @@ public class GameLogic
         Console.WriteLine("Welcome to the Text-RPG!");
         Console.WriteLine("------------------------------------");
 
-        // ObjectManager und SaveGameManager müssen immer als Erstes initialisiert werden
-        objectManager = new ObjectManager();
-        saveGameManager = new SaveGameManager();
-
-        // --- Startbildschirm ---
         Console.WriteLine("\nChoose an option:");
         Console.WriteLine("1. New Game");
         Console.WriteLine("2. Load Game");
@@ -43,7 +224,6 @@ public class GameLogic
             if (loadedData == null)
             {
                 Console.WriteLine("\nCould not load game. Starting a New Game instead.");
-                // Wenn Laden fehlschlägt, starten wir trotzdem ein neues Spiel.
             }
         }
         else if (choice != "1")
@@ -51,22 +231,21 @@ public class GameLogic
             Console.WriteLine("\nInvalid choice. Starting a New Game by default.");
         }
 
-        // --- Spielzustand initialisieren oder laden ---
+        // Initialize game components based on loaded data or new game
         if (loadedData != null)
         {
-            // Spielzustand aus geladenen Daten wiederherstellen
             currentRoom = objectManager.GetRoom(loadedData.CurrentRoomName);
-            player = new Player(loadedData.PlayerName);
+            player = new Player(loadedData.PlayerName); // Re-initialize player
             foreach (var itemName in loadedData.PlayerInventoryItemNames)
             {
                 Item item = objectManager.GetItem(itemName);
                 if (item != null)
                 {
-                    player.Inventory.Add(item);
+                    player.Inventory.Add(item); // Add loaded items to inventory
                 }
             }
 
-            // Exits-Zustände wiederherstellen
+            // Restore room exit locked states
             foreach (var roomEntry in loadedData.RoomExitLockedStates)
             {
                 Room room = objectManager.GetRoom(roomEntry.Key);
@@ -82,8 +261,7 @@ public class GameLogic
                 }
             }
 
-            // Event-Zustände wiederherstellen
-            gameEvents = new Events(loadedData.CurrentRoomName, player, objectManager);
+            gameEvents = new Events(currentRoom.Name, player, objectManager);
             gameEvents.SetGuestroomEventCount(loadedData.GuestroomEventCount);
             gameEvents.SetLibraryEventCount(loadedData.LibraryEventCount);
             gameEvents.SetCorridorLibraryDoorUnlocked(loadedData.CorridorLibraryDoorUnlocked);
@@ -92,24 +270,20 @@ public class GameLogic
         }
         else
         {
-            // Neues Spiel starten
-            currentRoom = objectManager.GetRoom("Hallway"); // Startraum für neues Spiel
-            player = new Player("Hero"); // Standardspieler für neues Spiel
-            gameEvents = new Events(currentRoom.Name, player, objectManager);
+            currentRoom = objectManager.GetRoom("Hallway"); // Set initial room for new game
+            player = new Player("Hero"); // Create new player
+            gameEvents = new Events(currentRoom.Name, player, objectManager); // Initialize events for new game
             Console.WriteLine("Starting a new game...");
         }
 
-        // Interactions muss immer nach currentRoom und player initialisiert werden
+        // Initialize interactions AFTER currentRoom and player are set
         interactions = new Interactions(player, currentRoom, objectManager);
 
-        DisplayRoom(); // Zeige den initialen oder geladenen Raum an
-        TestItems();
+        DisplayRoom(); // Show the initial or loaded room
+        TestItems(); // Add test items (only for development)
 
-
-        // Checkt, ob beim Start ein Event im aktuellen Raum triggert (z.B. im Hallway)
         inExclusiveEventMode = gameEvents.CheckForRoomEvents();
 
-        // --- Hauptspielschleife ---
         while (true)
         {
             if (inExclusiveEventMode)
@@ -120,7 +294,6 @@ public class GameLogic
 
                 if (!inExclusiveEventMode)
                 {
-                    // Spezialfall für Guestroom-Event: wenn Flucht, Raumwechsel erzwingen
                     if (eventCommand == "untersuchen" && gameEvents.CurrentRoomName == "Guestroom" && currentRoom.Name != "Hallway")
                     {
                         currentRoom = objectManager.GetRoom("Hallway");
@@ -128,13 +301,11 @@ public class GameLogic
                         gameEvents.UpdateCurrentRoom(currentRoom.Name);
                         DisplayRoom();
                     }
-                    // Optional: Nach einem beendeten Event ohne Raumwechsel erneut den Raum beschreiben
-                    // DisplayRoom(); // Oder spezifischere Nachrichten je nach Event
                 }
             }
-            else // Normale Spielschleife
+            else
             {
-                Console.Write("\nWhat do you want to do? (e.g., go north, look, take item, inventory, use [item] on [direction], 'quit', 'save', 'load') ");
+                Console.Write("\nWhat do you want to do? (e.g., go north, look, take item, inventory, use [item] on [direction], combine [item1] [item2], 'quit', 'save', 'load') ");
                 string command = Console.ReadLine().ToLower().Trim();
 
                 if (command == "quit")
@@ -142,7 +313,7 @@ public class GameLogic
                     Console.WriteLine("Thanks for playing!");
                     break;
                 }
-                else if (command == "save") // 'save' Befehl
+                else if (command == "save")
                 {
                     SaveGameData dataToSave = new SaveGameData
                     {
@@ -154,7 +325,8 @@ public class GameLogic
                         CorridorLibraryDoorUnlocked = gameEvents.GetCorridorLibraryDoorUnlocked()
                     };
 
-                    // Zustand aller Türen speichern
+                    dataToSave.RoomExitLockedStates = new Dictionary<string, Dictionary<string, bool>>();
+
                     foreach (var roomEntry in objectManager.WorldRooms)
                     {
                         string roomName = roomEntry.Key;
@@ -167,7 +339,7 @@ public class GameLogic
                     }
                     saveGameManager.SaveGame(dataToSave);
                 }
-                else if (command == "load") // 'load' Befehl
+                else if (command == "load")
                 {
                     Console.WriteLine("\nWarning: Loading will overwrite your current progress. Continue? (yes/no)");
                     string confirmLoad = Console.ReadLine().ToLower().Trim();
@@ -176,9 +348,8 @@ public class GameLogic
                         SaveGameData reloadedData = saveGameManager.LoadGame();
                         if (reloadedData != null)
                         {
-                            // Spielzustand aus geladenen Daten wiederherstellen
                             currentRoom = objectManager.GetRoom(reloadedData.CurrentRoomName);
-                            player.Inventory.Clear(); // Aktuelles Inventar leeren
+                            player.Inventory.Clear();
                             foreach (var itemName in reloadedData.PlayerInventoryItemNames)
                             {
                                 Item item = objectManager.GetItem(itemName);
@@ -188,7 +359,6 @@ public class GameLogic
                                 }
                             }
 
-                            // Exits-Zustände wiederherstellen (setzt alle Türen auf den gespeicherten Zustand)
                             foreach (var roomEntry in objectManager.WorldRooms)
                             {
                                 Room room = roomEntry.Value;
@@ -204,16 +374,19 @@ public class GameLogic
                                 }
                             }
 
-                            // Event-Zustände wiederherstellen
-                            gameEvents.UpdateCurrentRoom(reloadedData.CurrentRoomName); // Aktualisiere den Raumnamen im Events-Objekt
+                            gameEvents.UpdateCurrentRoom(reloadedData.CurrentRoomName);
                             gameEvents.SetGuestroomEventCount(reloadedData.GuestroomEventCount);
                             gameEvents.SetLibraryEventCount(reloadedData.LibraryEventCount);
                             gameEvents.SetCorridorLibraryDoorUnlocked(reloadedData.CorridorLibraryDoorUnlocked);
 
-                            interactions.UpdateCurrentRoom(currentRoom); // Interactions muss auch aktualisiert werden
+                            interactions.UpdateCurrentRoom(currentRoom);
                             Console.WriteLine("Game state has been successfully loaded.");
-                            DisplayRoom(); // Den geladenen Raum anzeigen
-                            inExclusiveEventMode = gameEvents.CheckForRoomEvents(); // Überprüfen, ob ein Event im geladenen Raum triggern soll
+                            DisplayRoom();
+                            inExclusiveEventMode = gameEvents.CheckForRoomEvents();
+                        }
+                        else
+                        {
+                            Console.WriteLine("Could not load game. No save file found or data is corrupted.");
                         }
                     }
                     else
@@ -225,31 +398,9 @@ public class GameLogic
                 {
                     player.DisplayInventory();
                 }
-                else if (command == "look") // Hinzugefügter 'look' Befehl
+                else if (command == "look")
                 {
-                    Console.WriteLine($"\n--- {currentRoom.Name.ToUpper()} ---");
-                    Console.WriteLine(currentRoom.Description);
-                    Console.WriteLine(currentRoom.GetAvailableExits());
-
-                    if (currentRoom.ItemsInRoom.Any())
-                    {
-                        Console.WriteLine("You see the following items here:");
-                        foreach (var item in currentRoom.ItemsInRoom)
-                        {
-                            if (item.ItemsInBox.Any())
-                            {
-                                Console.WriteLine($"- {item.Name} (which contains something)");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"- {item.Name}");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("There are no notable items here.");
-                    }
+                    DisplayRoom();
                 }
                 else if (command.StartsWith("look "))
                 {
@@ -262,25 +413,18 @@ public class GameLogic
                     }
                     if (foundItem != null)
                     {
-                        if (foundItem.Moveable == false)
+                        Console.WriteLine($"You look closely at the {foundItem.Name}. {foundItem.Description}");
+                        if (foundItem.ItemsInBox.Any())
                         {
-                            Console.WriteLine($"You look at the {foundItem.Name}. {foundItem.Description}");
-                            if (foundItem.ItemsInBox.Any())
+                            Console.WriteLine($"Inside the {foundItem.Name}, you see:");
+                            foreach (var containedItem in foundItem.ItemsInBox)
                             {
-                                Console.WriteLine($"Inside the {foundItem.Name}, you see:");
-                                foreach (var containedItem in foundItem.ItemsInBox)
-                                {
-                                    Console.WriteLine($"- {containedItem.Name}");
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine($"The {foundItem.Name} appears to be empty.");
+                                Console.WriteLine($"- {containedItem.Name}");
                             }
                         }
-                        else
+                        else if (!foundItem.Moveable)
                         {
-                            Console.WriteLine($"You look closely at the {foundItem.Name}. {foundItem.Description}");
+                            Console.WriteLine($"The {foundItem.Name} appears to be empty.");
                         }
                     }
                     else
@@ -293,7 +437,9 @@ public class GameLogic
                     string itemName = command.Substring("take ".Length).Trim();
                     Item itemToTake = null;
                     Item containerItem = null;
+
                     itemToTake = currentRoom.ItemsInRoom.Find(item => item.Name.ToLower() == itemName.ToLower());
+
                     if (itemToTake == null)
                     {
                         foreach (var roomItem in currentRoom.ItemsInRoom)
@@ -309,6 +455,7 @@ public class GameLogic
                             }
                         }
                     }
+
                     if (itemToTake != null)
                     {
                         if (itemToTake.Moveable)
@@ -348,6 +495,57 @@ public class GameLogic
                         Console.WriteLine("Invalid 'use' command. Try 'use [item] on [direction]'.");
                     }
                 }
+                else if (command.StartsWith("combine ")) // Updated parsing for "combine item1 and item2"
+                {
+                    string remainder = command.Substring("combine ".Length).Trim();
+                    string item1Name;
+                    string item2Name;
+
+                    int andIndex = remainder.IndexOf(" and ");
+                    int withIndex = remainder.IndexOf(" with ");
+
+                    if (andIndex != -1)
+                    {
+                        item1Name = remainder.Substring(0, andIndex).Trim();
+                        item2Name = remainder.Substring(andIndex + " and ".Length).Trim();
+                    }
+                    else if (withIndex != -1)
+                    {
+                        item1Name = remainder.Substring(0, withIndex).Trim();
+                        item2Name = remainder.Substring(withIndex + " with ".Length).Trim();
+                    }
+                    else
+                    {
+                        // Fallback for "combine item1 item2" if no 'and'/'with' is found
+                        string[] parts = remainder.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2) // At least two words after "combine"
+                        {
+                            item1Name = parts[0];
+                            // If item names can be multi-word and no 'and'/'with' is used, this simple split is insufficient.
+                            // For now, take the rest as item2. This is a common simplification for text parsers.
+                            item2Name = string.Join(" ", parts.Skip(1));
+                        }
+                        else
+                        {
+                            Console.WriteLine("Invalid 'combine' command. Try 'combine [item1_name] and [item2_name]' or 'combine [item1_name] [item2_name]'.");
+                            continue;
+                        }
+                    }
+                    
+                    Item item1 = player.Inventory.FirstOrDefault(i => i.Name.Equals(item1Name, StringComparison.OrdinalIgnoreCase));
+                    Item item2 = player.Inventory.FirstOrDefault(i => i.Name.Equals(item2Name, StringComparison.OrdinalIgnoreCase));
+
+                    if (item1 != null && item2 != null)
+                    {
+                        TryCombineItems(item1, item2); // Call the generic combination handler
+                    }
+                    else
+                    {
+                        Console.WriteLine("You need to have both items in your inventory to combine them.");
+                        if (item1 == null) Console.WriteLine($"You don't have '{item1Name}' in your inventory.");
+                        if (item2 == null) Console.WriteLine($"You don't have '{item2Name}' in your inventory.");
+                    }
+                }
                 else if (command.StartsWith("go ") || currentRoom.Exits.ContainsKey(command))
                 {
                     string direction = command.StartsWith("go ") ? command.Substring(3) : command;
@@ -360,51 +558,4 @@ public class GameLogic
             }
         }
     }
-
-    static void DisplayRoom()
-    {
-        Console.WriteLine($"\n--- {currentRoom.Name.ToUpper()} ---");
-        Console.WriteLine(currentRoom.Description);
-        Console.WriteLine(currentRoom.GetAvailableExits());
-    }
-
-    static void TestItems()
-    {
-        foreach (var testItem in Item.ItemsToTest)
-        {
-            player.Inventory.Add(testItem);
-        }
-    }
-
-    static void MovePlayer(string direction)
-    {
-        if (currentRoom.Exits.TryGetValue(direction, out Exit exit))
-        {
-            if (exit.IsLocked)
-            {
-                // GEÄNDERT: Allgemeine Meldung ohne Item-Name
-                Console.WriteLine($"The door is locked. Maybe you need something to open it.");
-            }
-            else
-            {
-                currentRoom = exit.TargetRoom;
-                interactions.UpdateCurrentRoom(currentRoom);
-                gameEvents.UpdateCurrentRoom(currentRoom.Name);
-
-                DisplayRoom();
-
-                inExclusiveEventMode = gameEvents.CheckForRoomEvents();
-
-                if (inExclusiveEventMode)
-                {
-                    // If an exclusive event started, it takes over the input
-                }
-            }
-        }
-        else
-        {
-            Console.WriteLine("You can't go that way.");
-        }
-    }
 }
-

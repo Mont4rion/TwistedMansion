@@ -1,24 +1,24 @@
+using System;
+using System.Collections.Generic; // Make sure this is present
+
 public class ObjectManager
 {
     public Dictionary<string, Room> WorldRooms { get; private set; }
     public Dictionary<string, Item> WorldItems { get; private set; }
-    public Item Item;
+    public Dictionary<string, Kombinations> WorldKombinations { get; private set; }
 
     public ObjectManager()
     {
         WorldRooms = new Dictionary<string, Room>();
         WorldItems = new Dictionary<string, Item>();
+        WorldKombinations = new Dictionary<string, Kombinations>();
 
-        // Important: ItemsToTest is a STATIC list. It will only be initialized ONCE
-        // even if you create multiple ObjectManager instances.
-        // It's populated in InitializeItems.
-        InitializeRooms();
-        InitializeItems();
-        // Crucially, we DO NOT call EquipPlayerWithTestItems here.
-        // The ObjectManager's job is to set up the world, not to manage players directly.
+        // IMPORTANT: Removed initialization calls from here.
+        // GameLogic's static constructor will now call InitializeRooms(), InitializeItems(), etc.
+        // This prevents double initialization and centralizes the game's startup sequence in GameLogic.
     }
 
-    private void InitializeRooms()
+    public void InitializeRooms()
     {
         Room hallway = new Room("Hallway", "You are in a long, dimly lit hallway. The air smells musty.");
         Room library = new Room("Library", "A vast library filled with dusty tomes. A faint glow emanates from a corner.");
@@ -55,12 +55,51 @@ public class ObjectManager
         Console.WriteLine("Game world (rooms and exits) initialized successfully.");
     }
 
-    private void InitializeItems()
+    // In ObjectManager.cs
+
+    public void InitializeKombinations()
+    {
+        Console.WriteLine("Initializing Kombinations...");
+
+        // Important: The "Butterfly" string here acts as a generic placeholder
+        // for ANY butterfly. The TryCombineItems logic handles this.
+        WorldKombinations.Add("Frame with one butterfly in it", new Kombinations(
+            "Frame with one butterfly in it",
+            "An empty wooden frame with a glass panel and one beautiful butterfly.",
+            true,
+            new List<string> { "Empty Frame", "Butterfly" } // "Butterfly" is the generic type
+        ));
+
+        WorldKombinations.Add("Frame with two butterflies in it", new Kombinations(
+            "Frame with two butterflies in it",
+            "An empty wooden frame with a glass panel and two beautiful butterflies.",
+            true,
+            new List<string> { "Frame with one butterfly in it", "Butterfly" }
+        ));
+
+        WorldKombinations.Add("Frame with three butterflies in it", new Kombinations(
+            "Frame with three butterflies in it",
+            "An empty wooden frame with a glass panel and three beautiful butterflies.",
+            true,
+            new List<string> { "Frame with two butterflies in it", "Butterfly" }
+        ));
+
+        WorldKombinations.Add("Frame with four butterflies in it", new Kombinations(
+            "Frame with four butterflies in it",
+            "An empty wooden frame with a glass panel and all four beautiful butterflies.",
+            true,
+            new List<string> { "Frame with three butterflies in it", "Butterfly" }
+        ));
+
+        Console.WriteLine("Kombinations initialized successfully.");
+    }
+
+    public void InitializeItems()
     {
         Item rustyKey = new Item("Rusty Key", "A very old, rusty key. It looks like it might open something.", true);
         WorldItems.Add("Rusty Key", rustyKey);
 
-        Item oldBook = new Item("Old Book", "Als du die Bibliothek betrittst, fällt dein Blick auf ein seltsam leuchtendes Buch. Es pulsiert sanft auf einem der oberen Regale. ", false);
+        Item oldBook = new Item("Old Book", "Als du die Bibliothek betrittst, fällt dein Blick auf ein seltsam leuchtendes Buch. Es pulsiert sanft auf einem der oberen Regale.", false);
         WorldItems.Add("Old Book", oldBook);
 
         Item kitchenKnife = new Item("Kitchen Knife", "A dull and brittle knife.", true);
@@ -69,8 +108,8 @@ public class ObjectManager
         Item kitchenShelf = new Item("Kitchen Shelf", "An old, worn-out shelf fixed to the wall. It looks like it could hold items.", false);
         WorldItems.Add("Kitchen Shelf", kitchenShelf);
 
-        Item frame = new Item("Frame", "A empty wooden frame with a glass pannel and 4 pins sticked in it", true);
-        WorldItems.Add("Frame", frame);
+        Item frame = new Item("Empty Frame", "An empty wooden frame with a glass panel and 4 pins stuck in it.", true); // Changed name to "Empty Frame" for clarity with combinations
+        WorldItems.Add("Empty Frame", frame); // Use "Empty Frame" as key
 
         Item butterflyBlue = new Item("Butterfly Blue", "A blue butterfly, you can't miss it is rare", true);
         WorldItems.Add("Butterfly Blue", butterflyBlue);
@@ -84,21 +123,26 @@ public class ObjectManager
         Item butterflyBlack = new Item("Butterfly Black", "A black butterfly, you can't miss it is rare", true);
         WorldItems.Add("Butterfly Black", butterflyBlack);
 
+        // Add the combined items directly to WorldItems as well, so they can exist in the game world
+        // This is crucial if these are items players can gain and lose.
+        // Their details (description, combinability) are defined within the Kombinations objects above.
+        // Here, we just ensure the Item objects exist in WorldItems.
+        // NOTE: The description below is just a placeholder. The Kombinations class should manage the final description.
+        WorldItems.Add("Frame with one butterfly in it", new Item("Frame with one butterfly in it", "A frame with one butterfly attached.", true));
+        WorldItems.Add("Frame with two butterflies in it", new Item("Frame with two butterflies in it", "A frame with two butterflies attached.", true));
+        WorldItems.Add("Frame with three butterflies in it", new Item("Frame with three butterflies in it", "A frame with three butterflies attached.", true));
+        WorldItems.Add("Frame with four butterflies in it", new Item("Frame with four butterflies in it", "A frame with four butterflies attached.", true));
+
+
         WorldRooms["Hallway"].ItemsInRoom.Add(rustyKey);
         WorldRooms["Library"].ItemsInRoom.Add(oldBook);
         WorldRooms["Kitchen"].ItemsInRoom.Add(kitchenShelf);
 
         kitchenShelf.ItemsInBox.Add(kitchenKnife);
 
-        // --- Test Items Population ---
-        // This is where the static list Item.ItemsToTest is populated.
-        // It's crucial to understand that this list is global and will retain its contents
-        // across different ObjectManager instances (though you typically only have one).
-        // If you call InitializeItems multiple times, these items will be added repeatedly
-        // to Item.ItemsToTest unless you clear it first.
-        // For a game, this kind of static global list for "test items" is often
-        // better handled by a dedicated debug or utility class.
-        Item.ItemsToTest.Add(frame);
+        // Populate Item.ItemsToTest with items if needed for debugging or specific test scenarios.
+        // Consider if this list should be cleared before adding if InitializeItems can be called multiple times.
+        Item.ItemsToTest.Add(frame); // This is now "Empty Frame"
         Item.ItemsToTest.Add(butterflyBlue);
         Item.ItemsToTest.Add(butterflyGreen);
         Item.ItemsToTest.Add(butterflyRed);
