@@ -1,7 +1,7 @@
 public class Item
 {
     public string Name { get; private set; }
-    public string Description { get; private set; }
+    public string Description { get; set; }
     public bool Moveable { get; private set; }
     public List<Item> ItemsInBox { get; private set; } = new List<Item>(); // For containers
 

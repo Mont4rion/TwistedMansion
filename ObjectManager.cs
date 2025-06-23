@@ -57,42 +57,54 @@ public class ObjectManager
 
     // In ObjectManager.cs
 
-    public void InitializeKombinations()
-    {
-        Console.WriteLine("Initializing Kombinations...");
+public void InitializeKombinations()
+{
+    Console.WriteLine("Initializing Kombinations...");
 
-        // Important: The "Butterfly" string here acts as a generic placeholder
-        // for ANY butterfly. The TryCombineItems logic handles this.
-        WorldKombinations.Add("Frame with one butterfly in it", new Kombinations(
-            "Frame with one butterfly in it",
-            "An empty wooden frame with a glass panel and one beautiful butterfly.",
-            true,
-            new List<string> { "Empty Frame", "Butterfly" } // "Butterfly" is the generic type
-        ));
+    // Important: The "Butterfly" string here acts as a generic placeholder
+    // for ANY butterfly. The TryCombineItems logic handles this.
 
-        WorldKombinations.Add("Frame with two butterflies in it", new Kombinations(
-            "Frame with two butterflies in it",
-            "An empty wooden frame with a glass panel and two beautiful butterflies.",
-            true,
-            new List<string> { "Frame with one butterfly in it", "Butterfly" }
-        ));
+    // 1. Empty Frame + Butterfly -> Frame one Butterfly
+    WorldKombinations.Add("Frame one Butterfly", new Kombinations(
+        "Frame one Butterfly", // <--- Angepasster Name
+        "An empty wooden frame with a glass panel and one beautiful butterfly.",
+        true,
+        new List<string> { "Empty Frame", "Butterfly" } // "Butterfly" is the generic type
+    ));
 
-        WorldKombinations.Add("Frame with three butterflies in it", new Kombinations(
-            "Frame with three butterflies in it",
-            "An empty wooden frame with a glass panel and three beautiful butterflies.",
-            true,
-            new List<string> { "Frame with two butterflies in it", "Butterfly" }
-        ));
+    // 2. Frame one Butterfly + Butterfly -> Frame two Butterflies
+    WorldKombinations.Add("Frame two Butterflies", new Kombinations( // <--- Angepasster Name
+        "Frame two Butterflies", // <--- Angepasster Name
+        "An empty wooden frame with a glass panel and two beautiful butterflies.",
+        true,
+        new List<string> { "Frame one Butterfly", "Butterfly" } // <--- Angepasster Name
+    ));
 
-        WorldKombinations.Add("Frame with four butterflies in it", new Kombinations(
-            "Frame with four butterflies in it",
-            "An empty wooden frame with a glass panel and all four beautiful butterflies.",
-            true,
-            new List<string> { "Frame with three butterflies in it", "Butterfly" }
-        ));
+    // 3. Frame two Butterflies + Butterfly -> Frame three Butterflies
+    WorldKombinations.Add("Frame three Butterflies", new Kombinations( // <--- Angepasster Name
+        "Frame three Butterflies", // <--- Angepasster Name
+        "An empty wooden frame with a glass panel and three beautiful butterflies.",
+        true,
+        new List<string> { "Frame two Butterflies", "Butterfly" } // <--- Angepasster Name
+    ));
 
-        Console.WriteLine("Kombinations initialized successfully.");
-    }
+    // 4. Frame three Butterflies + Butterfly -> Frame four Butterflies
+    WorldKombinations.Add("Frame four Butterflies", new Kombinations( // <--- Angepasster Name
+        "Frame four Butterflies", // <--- Angepasster Name
+        "An empty wooden frame with a glass panel and all four beautiful butterflies.",
+        true,
+        new List<string> { "Frame three Butterflies", "Butterfly" } // <--- Angepasster Name
+    ));
+
+   WorldKombinations.Add("Sticky stick", new Kombinations(
+        "Sticky stick",             
+        "A stick with a sticky tip",
+        true,
+        new List<string> { "Stick", "Glue" }
+    ));
+
+    Console.WriteLine("Kombinations initialized successfully.");
+}
 
     public void InitializeItems()
     {
@@ -123,15 +135,22 @@ public class ObjectManager
         Item butterflyBlack = new Item("Butterfly Black", "A black butterfly, you can't miss it is rare", true);
         WorldItems.Add("Butterfly Black", butterflyBlack);
 
+        Item stick = new Item("Stick", "Just a boring stick", true);
+        WorldItems.Add("Stick", stick);
+
+        Item glue = new Item("Glue", "Sticky stuff that could be used as glue", true);
+        WorldItems.Add("Glue", glue);
+
         // Add the combined items directly to WorldItems as well, so they can exist in the game world
         // This is crucial if these are items players can gain and lose.
         // Their details (description, combinability) are defined within the Kombinations objects above.
         // Here, we just ensure the Item objects exist in WorldItems.
         // NOTE: The description below is just a placeholder. The Kombinations class should manage the final description.
-        WorldItems.Add("Frame with one butterfly in it", new Item("Frame with one butterfly in it", "A frame with one butterfly attached.", true));
-        WorldItems.Add("Frame with two butterflies in it", new Item("Frame with two butterflies in it", "A frame with two butterflies attached.", true));
-        WorldItems.Add("Frame with three butterflies in it", new Item("Frame with three butterflies in it", "A frame with three butterflies attached.", true));
-        WorldItems.Add("Frame with four butterflies in it", new Item("Frame with four butterflies in it", "A frame with four butterflies attached.", true));
+        WorldItems.Add("Frame one Butterfly", new Item("Frame one Butterfly", "A frame with one butterfly attached.", true));
+        WorldItems.Add("Frame two Butterflies", new Item("Frame two Butterflies", "A frame with two butterflies attached.", true));
+        WorldItems.Add("Frame three Butterflies", new Item("Frame three Butterflies", "A frame with three butterflies attached.", true));
+        WorldItems.Add("Frame four Butterflies", new Item("Frame four Butterflies", "A frame with four butterflies attached.", true));
+        WorldItems.Add("Sticky stick", new Item("Sticky stick", "A stick with a sticky tip", true));
 
 
         WorldRooms["Hallway"].ItemsInRoom.Add(rustyKey);
@@ -139,14 +158,6 @@ public class ObjectManager
         WorldRooms["Kitchen"].ItemsInRoom.Add(kitchenShelf);
 
         kitchenShelf.ItemsInBox.Add(kitchenKnife);
-
-        // Populate Item.ItemsToTest with items if needed for debugging or specific test scenarios.
-        // Consider if this list should be cleared before adding if InitializeItems can be called multiple times.
-        Item.ItemsToTest.Add(frame); // This is now "Empty Frame"
-        Item.ItemsToTest.Add(butterflyBlue);
-        Item.ItemsToTest.Add(butterflyGreen);
-        Item.ItemsToTest.Add(butterflyRed);
-        Item.ItemsToTest.Add(butterflyBlack);
 
         Console.WriteLine("Game items initialized successfully.");
     }

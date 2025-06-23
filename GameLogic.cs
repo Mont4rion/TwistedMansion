@@ -83,6 +83,14 @@ public class GameLogic
         {
             player.AddItem(objectManager.WorldItems["Butterfly Black"]);
         }
+        if (!player.Inventory.Any(i => i.Name == "Glue"))
+        {
+            player.AddItem(objectManager.WorldItems["Glue"]);
+        }
+        if (!player.Inventory.Any(i => i.Name == "Stick"))
+        {
+            player.AddItem(objectManager.WorldItems["Stick"]);
+        }
     }
 
     /// <summary>
@@ -91,12 +99,17 @@ public class GameLogic
     /// </summary>
     /// <param name="item1ToCombine">The first item object from the player's inventory.</param>
     /// <param name="item2ToCombine">The second item object from the player's inventory.</param>
+   // GameLogic.cs (innerhalb der TryCombineItems-Methode)
+
+    // GameLogic.cs (innerhalb der TryCombineItems-Methode)
+
+    // GameLogic.cs (innerhalb der TryCombineItems-Methode)
+
     public static void TryCombineItems(Item item1ToCombine, Item item2ToCombine)
     {
         string name1 = item1ToCombine.Name;
         string name2 = item2ToCombine.Name;
 
-        // Collect all specific butterfly names for comparison
         List<string> specificButterflyNames = new List<string> { "Butterfly Blue", "Butterfly Red", "Butterfly Green", "Butterfly Black" };
 
         bool foundCombination = false;
@@ -105,58 +118,93 @@ public class GameLogic
         {
             Kombinations comboDefinition = combinationEntry.Value;
 
-            // Ensure the combination rule expects exactly two components
             if (comboDefinition.RequiredItems == null || comboDefinition.RequiredItems.Count != 2)
             {
-                continue; // Skip if not a 2-item combination
+                continue;
             }
 
             string required1 = comboDefinition.RequiredItems[0];
             string required2 = comboDefinition.RequiredItems[1];
 
-            // Check if player's items match the required components, considering permutations and generic "Butterfly"
-            bool match = false;
+            bool currentRuleMatches = false;
+            Item frameItemUsed = null;
+            Item butterflyItemUsed = null;
 
-            // Scenario 1: Both required items are specific names (no generic "Butterfly")
-            if (!required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) && !required2.Equals("Butterfly", StringComparison.OrdinalIgnoreCase))
+            // LOGIK FÜR SPEZIFISCHE KOMBINATIONEN (z.B. Stick + Glue)
+            // Wenn die Regel keine "Butterfly"-Platzhalter enthält
+            if (!required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) &&
+                !required2.Equals("Butterfly", StringComparison.OrdinalIgnoreCase))
             {
                 if ((name1.Equals(required1, StringComparison.OrdinalIgnoreCase) && name2.Equals(required2, StringComparison.OrdinalIgnoreCase)) ||
                     (name1.Equals(required2, StringComparison.OrdinalIgnoreCase) && name2.Equals(required1, StringComparison.OrdinalIgnoreCase)))
                 {
-                    match = true;
+                    currentRuleMatches = true;
                 }
             }
-            // Scenario 2: One specific item, one generic "Butterfly"
-            else if (required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) || required2.Equals("Butterfly", StringComparison.OrdinalIgnoreCase))
+            // LOGIK FÜR SCHMETTERLING-KOMBINATIONEN (z.B. Frame + Butterfly)
+            else
             {
-                string specificRequiredItem = required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) ? required2 : required1;
+                // Wenn die Regel einen "Butterfly"-Platzhalter enthält
+                string specificRequiredName = required1.Equals("Butterfly", StringComparison.OrdinalIgnoreCase) ? required2 : required1;
 
-                if ((name1.Equals(specificRequiredItem, StringComparison.OrdinalIgnoreCase) && specificButterflyNames.Contains(name2)) ||
-                    (name2.Equals(specificRequiredItem, StringComparison.OrdinalIgnoreCase) && specificButterflyNames.Contains(name1)))
+                if ((name1.Equals(specificRequiredName, StringComparison.OrdinalIgnoreCase) && specificButterflyNames.Contains(name2, StringComparer.OrdinalIgnoreCase)))
                 {
-                    match = true;
+                    currentRuleMatches = true;
+                    frameItemUsed = item1ToCombine;
+                    butterflyItemUsed = item2ToCombine;
+                }
+                else if ((name2.Equals(specificRequiredName, StringComparison.OrdinalIgnoreCase) && specificButterflyNames.Contains(name1, StringComparer.OrdinalIgnoreCase)))
+                {
+                    currentRuleMatches = true;
+                    frameItemUsed = item2ToCombine;
+                    butterflyItemUsed = item1ToCombine;
                 }
             }
 
-            if (match)
+            // Wenn die aktuelle Regel matched, verarbeite die Kombination
+            if (currentRuleMatches)
             {
-                Console.WriteLine($"You combined the {name1} and the {name2} to create a {comboDefinition.Name}!");
-                player.RemoveItem(item1ToCombine);
-                player.RemoveItem(item2ToCombine);
-
-                // Add the resulting item to the player's inventory
                 Item resultItem = objectManager.GetItem(comboDefinition.Name);
                 if (resultItem != null)
                 {
+                    // Logic for handling ItemsInBox (specific to frames)
+                    if (frameItemUsed != null && resultItem.Name.Contains("Frame", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Copy existing butterflies from the old frame to the new one
+                        foreach (var existingButterfly in frameItemUsed.ItemsInBox)
+                        {
+                            resultItem.ItemsInBox.Add(existingButterfly);
+                        }
+                    }
+
+                    // Add the newly combined butterfly (if applicable)
+                    if (butterflyItemUsed != null)
+                    {
+                        resultItem.ItemsInBox.Add(butterflyItemUsed);
+                    }
+
+                    // Update description for frame items based on content
+                    if (resultItem.Name.Contains("Frame", StringComparison.OrdinalIgnoreCase))
+                    {
+                        UpdateFrameDescription(resultItem);
+                    }
+
+                    // Remove the original items from player's inventory
+                    player.RemoveItem(item1ToCombine);
+                    player.RemoveItem(item2ToCombine);
+
+                    // Add the resulting item to player's inventory
                     player.AddItem(resultItem);
+
+                    Console.WriteLine($"You combined the {name1} and the {name2} to create a {comboDefinition.Name}!");
                     foundCombination = true;
-                    break; // Combination found and processed, exit loop
+                    break;
                 }
                 else
                 {
-                    Console.WriteLine($"Error: The resulting item '{comboDefinition.Name}' was not found in the game world.");
-                    foundCombination = true; // Mark as found to avoid "cannot be combined" message
-                    break; // Exit loop even on error, as a rule was matched
+                    Console.WriteLine($"Error: The resulting item '{comboDefinition.Name}' was not found in the game world. Check ObjectManager.InitializeItems().");
+                    foundCombination = true;
+                    break;
                 }
             }
         }
@@ -167,6 +215,26 @@ public class GameLogic
         }
     }
 
+    // Füge diese Hilfsmethode in GameLogic.cs hinzu
+    private static void UpdateFrameDescription(Item frame)
+    {
+        if (frame != null && frame.Name.Contains("Frame"))
+        {
+            if (frame.ItemsInBox.Count == 0)
+            {
+                frame.Description = "An empty wooden frame with a glass panel and 4 pins stuck in it.";
+            }
+            else if (frame.ItemsInBox.Count == 1)
+            {
+                frame.Description = $"An empty wooden frame with a glass panel and one beautiful butterfly ({frame.ItemsInBox[0].Name}).";
+            }
+            else if (frame.ItemsInBox.Count > 0)
+            {
+                string butterflyNames = string.Join(", ", frame.ItemsInBox.Select(b => b.Name));
+                frame.Description = $"An empty wooden frame with a glass panel and {frame.ItemsInBox.Count} beautiful butterflies: {butterflyNames}.";
+            }
+        }
+    }
 
     /// <summary>
     /// Handles player movement to a different room.
